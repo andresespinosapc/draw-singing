@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AudioContext from "./contexts/AudioContext";
 import autoCorrelate from "./libs/AutoCorrelate";
 import {
   noteFromPitch,
   centsOffFromPitch,
   getDetunePercent,
+continuousNoteFromFrequency,
 } from "./libs/Helpers";
 
 const audioCtx = AudioContext.getAudioContext();
@@ -29,6 +30,9 @@ const noteStrings = [
   "B",
 ];
 
+let isGoingForward = false;
+let isGoingBackward = false;
+
 export default function App() {
   const [source, setSource] = useState(null);
   const [started, setStart] = useState(false);
@@ -37,21 +41,22 @@ export default function App() {
   const [pitch, setPitch] = useState("0 Hz");
   const [detune, setDetune] = useState("0");
   const [notification, setNotification] = useState(false);
+  const [note, setNote] = useState(6);
 
-  const updatePitch = (time) => {
+  const updatePitch = () => {
     analyserNode.getFloatTimeDomainData(buf);
     var ac = autoCorrelate(buf, audioCtx.sampleRate);
     if (ac > -1) {
-      let note = noteFromPitch(ac);
+      let note = continuousNoteFromFrequency(ac);
       let sym = noteStrings[note % 12];
       let scl = Math.floor(note / 12) - 1;
       let dtune = centsOffFromPitch(ac, note);
+      setNote(note);
       setPitch(parseFloat(ac).toFixed(2) + " Hz");
       setPitchNote(sym);
       setPitchScale(scl);
       setDetune(dtune);
       setNotification(false);
-      console.log(note, sym, scl, dtune, ac);
     }
   };
 
@@ -61,7 +66,9 @@ export default function App() {
     }
   }, [source]);
 
-  setInterval(updatePitch, 1);
+  useEffect(() => {
+    setInterval(updatePitch, 1);
+  }, []);
 
   const start = async () => {
     const input = await getMicInput();
@@ -91,75 +98,75 @@ export default function App() {
     });
   };
 
-  return (
-    <div className="flex justify-center items-center h-screen">
-      <div
-        className={
-          notification
-            ? "visible transition-all fixed top-0 bg-gray-400 text-white w-10/12 text-xs md:text-sm text-center py-4 mt-2 rounded-full shadow-2xl"
-            : "invisible fixed top-0"
-        }
-      >
-        Please, bring your instrument near to the microphone!
-      </div>
-      <div className="flex flex-col items-center">
-        <div
-          className={
-            started
-              ? "visible flex flex-col transition-all ease-in delay-75 bg-gray-200 justify-center items-center p-10 rounded-xl shadow-lg mb-5 w-60 h-60"
-              : "invisible transition-all w-0 h-0"
-          }
-        >
-          <div className="flex items-start font-mono">
-            <span
-              className={
-                started
-                  ? "visible transition-all delay-75 font-thin text-9xl"
-                  : "invisible text-xs"
-              }
-            >
-              {pitchNote}
-            </span>
-            <span className="bg-green-600 p-1 px-2 text-white rounded-lg">
-              {pitchScale}
-            </span>
-          </div>
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasHeight = document.body.clientHeight;
+  const canvasWidth = document.body.clientWidth;
+  const DOT_WIDTH = 1;
+  const DRAW_INTERVAL = 4;
+  const INITIAL_X_POSITION = 100;
+  const [currentXPosition, setCurrentXPosition] = useState(INITIAL_X_POSITION);
+  useEffect(() => {
+  }, []);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const context = canvasRef.current?.getContext('2d');
+      if (!context) throw new Error('Context not found');
 
-          <div className="w-full flex justify-center items-center">
-            <div
-              className="bg-gradient-to-r to-green-400 from-red-600 py-1 rounded-full rotate-180"
-              style={{
-                width: (detune < 0 ? getDetunePercent(detune) : "50") + "%",
-              }}
-            ></div>
-            <span className="font-bold text-lg text-green-800">I</span>
-            <div
-              className="bg-gradient-to-r from-green-400 to-red-600 py-1 rounded-full"
-              style={{
-                width: (detune > 0 ? getDetunePercent(detune) : "50") + "%",
-              }}
-            ></div>
-          </div>
-          <div className="mt-2 text-xs text-gray-400">
-            <span>{pitch}</span>
-          </div>
-        </div>
-        {!started ? (
-          <button
-            className="bg-red-600 text-white w-20 h-20 rounded-full shadow-xl transition-all"
-            onClick={start}
-          >
-            Start
-          </button>
-        ) : (
-          <button
-            className="bg-red-800 text-white w-20 h-20 rounded-full shadow-xl transition-all"
-            onClick={stop}
-          >
-            Stop
-          </button>
-        )}
-      </div>
+      context.fillStyle = '#000000'
+      if (isGoingForward) setCurrentXPosition(prev => prev + DOT_WIDTH);
+      else if (isGoingBackward) setCurrentXPosition(prev => prev - DOT_WIDTH);
+    }, DRAW_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [])
+  useEffect(() => {
+    const context = canvasRef.current?.getContext('2d');
+    if (!context) throw new Error('Context not found');
+
+    const noteModulo = note % 12;
+    const currentYPosition = canvasHeight - canvasHeight / 12 * noteModulo;
+    context.fillRect(currentXPosition, currentYPosition, DOT_WIDTH, 5)
+  }, [currentXPosition, note])
+  useEffect(() => {
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key === 'Backspace') {
+        const canvas = canvasRef.current;
+        if (!canvas) throw new Error('Canvas not found');
+
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Context not found');
+
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        setCurrentXPosition(INITIAL_X_POSITION);
+      } else if (e.key === 'ArrowRight') {
+        if (!isGoingForward) isGoingForward = true;
+      } else if (e.key === 'ArrowLeft') {
+        if (!isGoingBackward) isGoingBackward = true;
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown);
+
+    return () => document.removeEventListener('keydown', onKeydown);
+  }, []);
+  useEffect(() => {
+    function onKeyup(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') {
+        isGoingForward = false;
+      } else if (e.key === 'ArrowLeft') {
+        isGoingBackward = false;
+      }
+    }
+
+    document.addEventListener('keyup', onKeyup);
+
+    return () => document.removeEventListener('keyup', onKeyup);
+  }, [])
+  useEffect(() => void start(), []);
+
+  return (
+    <div className="h-screen w-screen">
+      <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight} />
     </div>
   );
 }
