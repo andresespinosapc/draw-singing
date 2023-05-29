@@ -32,6 +32,7 @@ const noteStrings = [
 
 let isGoingForward = false;
 let isGoingBackward = false;
+let drawInterval: NodeJS.Timer | undefined = undefined;
 
 export default function App() {
   const [source, setSource] = useState<ReturnType<typeof audioCtx.createMediaStreamSource> | null>(null);
@@ -103,23 +104,25 @@ export default function App() {
   const canvasHeight = document.body.clientHeight;
   const canvasWidth = document.body.clientWidth;
   const DOT_WIDTH = 1;
-  const DRAW_INTERVAL = 4;
+  const [drawIntervalMilliseconds, setDrawIntervalMilliseconds] = useState(4);
   const INITIAL_X_POSITION = 100;
   const [currentXPosition, setCurrentXPosition] = useState(INITIAL_X_POSITION);
-  useEffect(() => {
-  }, []);
-  useEffect(() => {
-    const interval = setInterval(() => {
+  function setDrawInterval() {
+    if (drawInterval !== null) clearInterval(drawInterval);
+
+    drawInterval = setInterval(() => {
       const context = canvasRef.current?.getContext('2d');
       if (!context) throw new Error('Context not found');
 
       context.fillStyle = '#000000'
       if (isGoingForward) setCurrentXPosition(prev => prev + DOT_WIDTH);
       else if (isGoingBackward) setCurrentXPosition(prev => prev - DOT_WIDTH);
-    }, DRAW_INTERVAL);
+    }, drawIntervalMilliseconds);
 
-    return () => clearInterval(interval);
-  }, [])
+    return () => clearInterval(drawInterval);
+  }
+  useEffect(() => setDrawInterval(), []);
+  useEffect(() => setDrawInterval(), [drawIntervalMilliseconds]);
   useEffect(() => {
     const context = canvasRef.current?.getContext('2d');
     if (!context) throw new Error('Context not found');
@@ -167,6 +170,20 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen">
+      <div className="flex justify-between">
+        <div>Go right or left using arrow keys. Go up or down using your voice. Clear everything with backspace.</div>
+        <div className="flex justify-between">
+          <div>Speed:</div>
+          <input
+            className="ml-2"
+            type="range"
+            min="1"
+            max="100"
+            defaultValue="50"
+            onChange={e => setDrawIntervalMilliseconds(200/parseInt(e.target.value))}
+          />
+        </div>
+      </div>
       <canvas ref={canvasRef} width={canvasWidth} height={canvasHeight} />
     </div>
   );
