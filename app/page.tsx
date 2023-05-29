@@ -34,7 +34,7 @@ let isGoingForward = false;
 let isGoingBackward = false;
 
 export default function App() {
-  const [source, setSource] = useState(null);
+  const [source, setSource] = useState<ReturnType<typeof audioCtx.createMediaStreamSource> | null>(null);
   const [started, setStart] = useState(false);
   const [pitchNote, setPitchNote] = useState("C");
   const [pitchScale, setPitchScale] = useState("4");
@@ -52,10 +52,10 @@ export default function App() {
       let scl = Math.floor(note / 12) - 1;
       let dtune = centsOffFromPitch(ac, note);
       setNote(note);
-      setPitch(parseFloat(ac).toFixed(2) + " Hz");
+      setPitch(ac.toFixed(2) + " Hz");
       setPitchNote(sym);
-      setPitchScale(scl);
-      setDetune(dtune);
+      setPitchScale(scl.toString());
+      setDetune(dtune.toString());
       setNotification(false);
     }
   };
@@ -83,6 +83,8 @@ export default function App() {
   };
 
   const stop = () => {
+    if (source === null) throw new Error("Source is null");
+
     source.disconnect(analyserNode);
     setStart(false);
   };
@@ -93,7 +95,6 @@ export default function App() {
         echoCancellation: true,
         autoGainControl: false,
         noiseSuppression: false,
-        latency: 0,
       },
     });
   };
