@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AudioContext from "./contexts/AudioContext";
 import autoCorrelate from "./libs/AutoCorrelate";
 import {
   noteFromPitch,
@@ -10,8 +9,9 @@ import {
 continuousNoteFromFrequency,
 } from "./libs/Helpers";
 
-const audioCtx = AudioContext.getAudioContext();
-const analyserNode = AudioContext.getAnalyser();
+const audioCtx = new window.AudioContext();
+let analyserNode = audioCtx.createAnalyser();
+analyserNode.fftSize = 2048;
 const buflen = 2048;
 var buf = new Float32Array(buflen);
 
