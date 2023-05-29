@@ -15,7 +15,7 @@ const AudioContext = {
     analyser = audioCtx.createAnalyser();
   },
 
-  decodeAudioData(audioData) {
+  decodeAudioData(audioData: ArrayBuffer) {
     audioCtx.decodeAudioData(audioData).then(function (decodedData) {
       // use the decoded data here
     });
